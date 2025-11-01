@@ -458,8 +458,6 @@ def main():
         # use torch.inference_mode() and exception suppression
         with contextlib.suppress(KeyboardInterrupt), torch.inference_mode():
             while simulation_app.is_running() and controller.is_running:
-                if headless_mode:
-                    simulation_app.update()
                 current_time = time.time()
                 loop_count += 1
                 if not args_cli.replay_data:
