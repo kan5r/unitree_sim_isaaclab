@@ -207,6 +207,11 @@ def main():
                 except Exception as e:
                     print(f"[sim] failed to set physics dt: {e}")
         headless_mode = bool(getattr(args_cli, "headless", False))
+        if headless_mode:
+            print("[sim] headless mode detected – priming SimulationApp updates")
+            for _ in range(3):
+                simulation_app.update()
+                time.sleep(0.01)
         render_interval = None
         if args_cli.render_interval is not None:
             try:
@@ -453,6 +458,8 @@ def main():
         # use torch.inference_mode() and exception suppression
         with contextlib.suppress(KeyboardInterrupt), torch.inference_mode():
             while simulation_app.is_running() and controller.is_running:
+                if headless_mode:
+                    simulation_app.update()
                 current_time = time.time()
                 loop_count += 1
                 if not args_cli.replay_data:

@@ -8,16 +8,6 @@ ENV TZ=Asia/Shanghai
 ENV CONDA_DIR=/opt/conda
 ENV PATH=$CONDA_DIR/bin:$PATH
 
-# 设置 HTTP/HTTPS 代理（可选）
-ARG http_proxy
-ARG https_proxy
-ENV http_proxy=${http_proxy}
-ENV https_proxy=${https_proxy}
-
-# 使用阿里云源
-RUN sed -i 's|http://archive.ubuntu.com/ubuntu/|http://mirrors.aliyun.com/ubuntu/|g' /etc/apt/sources.list && \
-    sed -i 's|http://security.ubuntu.com/ubuntu/|http://mirrors.aliyun.com/ubuntu/|g' /etc/apt/sources.list
-
 
 # 安装构建依赖（GCC 12 + GLU + Vulkan）
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -98,7 +88,10 @@ ENV OMNI_KIT_DISABLE_STARTUP=1
 
 # 安装运行时依赖
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    libglu1-mesa git-lfs zenity unzip \
+    libglu1-mesa vulkan-tools \
+    libxt6 libxmu6 libxi6 libxrender1 libxrandr2 libxxf86vm1 \
+    libx11-6 libxkbcommon0 libxkbcommon-x11-0 \
+    git-lfs zenity unzip \
     && rm -rf /var/lib/apt/lists/*
 
 # 复制 Conda 环境和代码
@@ -118,7 +111,7 @@ RUN echo 'source /opt/conda/etc/profile.d/conda.sh' >> ~/.bashrc && \
     echo 'export OMNI_KIT_ALLOW_ROOT=1' >> ~/.bashrc && \
     echo 'export OMNI_KIT_DISABLE_STARTUP=1' >> ~/.bashrc
 
-WORKDIR /home/code
+WORKDIR /home/code/unitree_sim_isaaclab
 
 # 默认进入 Conda 环境 bash
 CMD ["conda", "run", "-n", "unitree_sim_env", "/bin/bash"]

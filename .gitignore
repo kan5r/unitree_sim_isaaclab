@@ -122,3 +122,4 @@ data/
 assets/
 assets.*
 assets
+${data}/
