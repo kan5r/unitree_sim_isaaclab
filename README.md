@@ -24,6 +24,26 @@
     </tr>
 </table>
 
+## 0、🛠️ 自作Docker
+### 0.1 ダウンロード
+```shell
+git clone https://github.com/kan5r/xr_teleoperate.git
+cd xr_teleoperate
+docker build -f docker/Dockerfile -t unitree-sim .
+bash fetch_assets.sh
+```
+
+### 0.2 実行
+ローカルでIsaacLabを使用する場合には`RUN-DOCKER-CONTAINER.sh`、リモートサーバーでheadlessで使用し、WebRTC Streamingを使用する場合は`RUN-DOCKER-CONTAINER-STREAMING.sh`を実行
+
+実行例。`--task`は適宜変更。
+```shell
+./RUN-DOCKER-CONTAINER.sh
+
+# コンテナ内
+python sim_main.py --device cpu --enable_cameras --task Isaac-PickPlace-Cylinder-G129-Dex3-Joint --enable_dex3_dds --robot_type g129
+```
+
 ## 1、 📖 Introduction
 
 This project is built on **Isaac Lab** to simulate **Unitree robots** in various tasks, facilitating data collection, playback, generation, and model validation. It can be used in conjunction with the [xr_teleoperate](https://github.com/unitreerobotics/xr_teleoperate) repository for dataset collection. The project adopts the same DDS communication protocol as the real robot to enhance code generality and ease of use.

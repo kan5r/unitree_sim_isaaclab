@@ -5,8 +5,10 @@ CONTAINER_NAME=${USER}-unitree-sim
 
 if ! docker image inspect ${IMAGE_NAME} > /dev/null 2>&1; then
     echo "Docker image ${IMAGE_NAME} not found."
-    echo "docker build -f docker/Dockerfile -t ${IMAGE_NAME} ."
-    docker build -f docker/Dockerfile -t ${IMAGE_NAME} .
+    echo "Please run the following command to build the image:"
+    echo "  docker build -f docker/Dockerfile -t ${IMAGE_NAME} ."
+    exit 1
+    
 fi
 
 xhost +local:docker
