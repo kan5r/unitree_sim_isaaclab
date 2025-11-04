@@ -25,9 +25,9 @@ class CameraBaseCfg:
         update_period: float = 0.02,
         height: int = 480,
         width: int =  640,
-        focal_length: float = 7.6,
-        focus_distance: float = 400.0,
-        horizontal_aperture: float = 20.0,
+        focal_length: float = 1.88,
+        focus_distance: float = 0.4,
+        horizontal_aperture: float = 2.61,
         clipping_range: tuple = (0.1, 1.0e5),
         pos_offset: tuple = (0, 0.0, 0),
         rot_offset: tuple = (0.5, -0.5, 0.5, -0.5),
@@ -64,6 +64,7 @@ class CameraBaseCfg:
                 focal_length=focal_length,
                 focus_distance=focus_distance,
                 horizontal_aperture=horizontal_aperture,
+                vertical_aperture=None,
                 clipping_range=clipping_range
             ),
             offset=CameraCfg.OffsetCfg(
