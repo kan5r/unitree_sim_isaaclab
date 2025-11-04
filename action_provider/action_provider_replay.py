@@ -260,7 +260,8 @@ class FileActionProviderReplay(ActionProvider):
             raise ValueError("Total width is not divisible by image_count. Cannot split cleanly.")
 
         images = {}
-        names = ['head', 'left', 'right']
+        # names = ['head', 'left', 'right']
+        names = ['head']
         for i, name in enumerate(names[:image_count]):
             x_start = i * single_width
             x_end = x_start + single_width

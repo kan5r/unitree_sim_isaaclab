@@ -70,10 +70,11 @@ parser.add_argument("--gravity_z", type=float, default=None, help="override grav
 parser.add_argument("--skip_cvtcolor", action="store_true", default=False, help="skip cv2.cvtColor if upstream already BGR")
 
 parser.add_argument("--camera_jpeg", action="store_true", default=True, help="enable JPEG compression for camera frames")
-parser.add_argument("--camera_jpeg_quality", type=int, default=85, help="JPEG quality (1-100)")
+parser.add_argument("--camera_jpeg_quality", type=int, default=90, help="JPEG quality (1-100)")
 
 parser.add_argument("--physx_substeps", type=int, default=None, help="physx substeps per step")
-parser.add_argument("--camera_include", type=str, default="front_camera,left_wrist_camera,right_wrist_camera", help="comma-separated camera names to enable")
+# parser.add_argument("--camera_include", type=str, default="front_camera,left_wrist_camera,right_wrist_camera", help="comma-separated camera names to enable")
+parser.add_argument("--camera_include", type=str, default="front_camera", help="comma-separated camera names to enable")
 parser.add_argument("--camera_exclude", type=str, default="world_camera", help="comma-separated camera names to disable")
 
 parser.add_argument("--env_reward_interval", type=int, default=5, help="environment reward compute interval (steps)")

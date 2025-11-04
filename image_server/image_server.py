@@ -8,7 +8,7 @@ import cv2
 import zmq
 import time
 import threading
-from image_server.shared_memory_utils import MultiImageReader
+from image_server.shared_memory_utils import MultiImageReader, SingleImageReader
 
 
 class ImageServer:
@@ -26,7 +26,10 @@ class ImageServer:
         self.frame_count = 0
 
         # Initialize multi-image shared memory reader
-        self.multi_image_reader = MultiImageReader()
+        # self.multi_image_reader = MultiImageReader()
+
+        # Initialize single image shared memory reader
+        self.single_image_reader = SingleImageReader()
 
         # Set ZeroMQ context and socket
         self.context = zmq.Context()
@@ -37,7 +40,6 @@ class ImageServer:
             self._init_performance_metrics()
 
         print(f"[Image Server] Multi-image server initialized on port {self.port}")
-        
         # start the publishing thread
         self.start_publishing()
 
@@ -66,7 +68,11 @@ class ImageServer:
         try:
             while True:
                 # read the concatenated images from shared memory
-                concatenated_image = self.multi_image_reader.read_concatenated_image()
+                concatenated_image = None
+                if hasattr(self, 'multi_image_reader'):
+                    concatenated_image = self.multi_image_reader.read_concatenated_image()
+                elif hasattr(self, 'single_image_reader'):
+                    concatenated_image = self.single_image_reader.read_image()
                 
                 if concatenated_image is None:
                     # if there is no image data, wait a moment and try again
@@ -74,11 +80,11 @@ class ImageServer:
                     continue
                 
                 # show the concatenated images
-                # cv2.imshow('Concatenated Images (Head + Left + Right)', concatenated_image)
-                # key = cv2.waitKey(1) & 0xFF
-                # if key == ord('q') or key == 27:  # 'q' 或 ESC 键退出
-                #     print("[Image Server] User pressed quit key")
-                #     break
+                cv2.imshow('Concatenated Images (Head + Left + Right)', concatenated_image)
+                key = cv2.waitKey(1) & 0xFF
+                if key == ord('q') or key == 27:  # 'q' 或 ESC 键退出
+                    print("[Image Server] User pressed quit key")
+                    break
                 
                 # encode the images
                 ret, buffer = cv2.imencode('.jpg', concatenated_image)
@@ -126,6 +132,9 @@ class ImageServer:
         # close the shared memory reader
         if hasattr(self, 'multi_image_reader'):
             self.multi_image_reader.close()
+        
+        if hasattr(self, 'single_image_reader'):
+            self.single_image_reader.close()
             
         # close the network connection
         self.socket.close()

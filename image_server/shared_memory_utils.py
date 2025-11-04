@@ -179,6 +179,201 @@ class MultiImageWriter:
             print(f"[MultiImageWriter] Shared memory closed: {self.shm_name}")
 
 
+class SingleImageWriter:
+    """Single image writer with optional JPEG compression"""
+
+    def __init__(self, shm_name: str = SHM_NAME, shm_size: int = 640*480*3+1024, *, enable_jpeg: bool = False, jpeg_quality: int = 85, skip_cvtcolor: bool = False):
+        self.shm_name = shm_name
+        self.shm_size = shm_size
+
+        self._min_interval_sec = 1.0 / 50.0
+        self._last_write_ts_ms = 0
+
+        self._enable_jpeg = bool(enable_jpeg)
+        self._jpeg_quality = int(jpeg_quality)
+        self._skip_cvtcolor = bool(skip_cvtcolor)
+
+        try:
+            self.shm = shared_memory.SharedMemory(name=shm_name)
+        except FileNotFoundError:
+            self.shm = shared_memory.SharedMemory(create=True, size=shm_size, name=shm_name)
+
+        print(f"[SingleImageWriter] Shared memory initialized: {shm_name}")
+
+    def set_options(self, *, enable_jpeg: Optional[bool] = None, jpeg_quality: Optional[int] = None, skip_cvtcolor: Optional[bool] = None):
+        if enable_jpeg is not None:
+            self._enable_jpeg = bool(enable_jpeg)
+        if jpeg_quality is not None:
+            self._jpeg_quality = int(jpeg_quality)
+        if skip_cvtcolor is not None:
+            self._skip_cvtcolor = bool(skip_cvtcolor)
+
+    def write_image(self, image: np.ndarray) -> bool:
+        if image is None or self.shm is None:
+            return False
+
+        now_ms = int(time.time() * 1000)
+        if self._last_write_ts_ms and (now_ms - self._last_write_ts_ms) < int(self._min_interval_sec * 1000):
+            return True
+
+        try:
+            frame = image
+            if frame.dtype != np.uint8:
+                frame = frame.astype(np.uint8)
+            if not frame.flags['C_CONTIGUOUS']:
+                frame = np.ascontiguousarray(frame)
+
+            if frame.ndim != 3 or frame.shape[2] != 3:
+                print(f"[SingleImageWriter] Expected HxWx3 image, got shape {frame.shape}")
+                return False
+
+            if not self._skip_cvtcolor:
+                frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+
+            height, width, channels = frame.shape
+
+            header = SimpleImageHeader()
+            header.timestamp = now_ms
+            header.height = height
+            header.width = width
+            header.channels = channels
+            header.single_width = width
+            header.image_count = 1
+
+            header_size = ctypes.sizeof(SimpleImageHeader)
+            header_view = memoryview(self.shm.buf)
+            data_view = memoryview(self.shm.buf)
+
+            if self._enable_jpeg:
+                encode_params = [int(cv2.IMWRITE_JPEG_QUALITY), int(self._jpeg_quality)]
+                ok, buffer = cv2.imencode('.jpg', frame, encode_params)
+                if not ok:
+                    print("[SingleImageWriter] JPEG encoding failed")
+                    return False
+                jpg_bytes = buffer.tobytes()
+                header.encoding = 1
+                header.quality = int(self._jpeg_quality)
+                header.data_size = len(jpg_bytes)
+                if header_size + header.data_size > self.shm_size:
+                    print(f"[SingleImageWriter] JPEG data too large for SHM: {header.data_size} > {self.shm_size - header_size}")
+                    return False
+                header_bytes = ctypes.string_at(ctypes.byref(header), header_size)
+                header_view[:header_size] = header_bytes
+                data_view[header_size:header_size + header.data_size] = jpg_bytes
+            else:
+                header.encoding = 0
+                header.quality = 0
+                raw_bytes = frame.tobytes()
+                header.data_size = len(raw_bytes)
+                if header_size + header.data_size > self.shm_size:
+                    print(f"[SingleImageWriter] RAW data too large for SHM: {header.data_size} > {self.shm_size - header_size}")
+                    return False
+                header_bytes = ctypes.string_at(ctypes.byref(header), header_size)
+                header_view[:header_size] = header_bytes
+                data_view[header_size:header_size + header.data_size] = raw_bytes
+
+            self._last_write_ts_ms = now_ms
+            return True
+        except Exception as e:
+            print(f"[SingleImageWriter] Error writing to shared memory: {e}")
+            return False
+
+    def close(self):
+        if hasattr(self, 'shm') and self.shm is not None:
+            self.shm.close()
+            print(f"[SingleImageWriter] Shared memory closed: {self.shm_name}")
+
+
+class SingleImageReader:
+    """Single image shared memory reader (returns dict with 'head' key)"""
+
+    def __init__(self, shm_name: str = SHM_NAME):
+        self.shm_name = shm_name
+        self.last_timestamp = 0
+        self.buffer: Dict[str, np.ndarray] = {}
+
+        try:
+            self.shm = shared_memory.SharedMemory(name=shm_name)
+            print(f"[SingleImageReader] Shared memory opened: {shm_name}")
+        except FileNotFoundError:
+            print(f"[SingleImageReader] Shared memory {shm_name} not found")
+            self.shm = None
+
+    def _read_header(self) -> Optional[SimpleImageHeader]:
+        if self.shm is None:
+            return None
+        header_size = ctypes.sizeof(SimpleImageHeader)
+        header_data = bytes(self.shm.buf[:header_size])
+        return SimpleImageHeader.from_buffer_copy(header_data)
+
+    def read_images(self) -> Optional[Dict[str, np.ndarray]]:
+        if self.shm is None:
+            return None
+
+        try:
+            header = self._read_header()
+            if header is None:
+                return None
+
+            if header.timestamp <= self.last_timestamp:
+                return self.buffer if self.buffer else None
+
+            header_size = ctypes.sizeof(SimpleImageHeader)
+            start_offset = header_size
+            end_offset = start_offset + header.data_size
+            payload = bytes(self.shm.buf[start_offset:end_offset])
+
+            if header.encoding == 1:
+                encoded = np.frombuffer(payload, dtype=np.uint8)
+                image = cv2.imdecode(encoded, cv2.IMREAD_COLOR)
+                if image is None:
+                    return None
+            else:
+                image = np.frombuffer(payload, dtype=np.uint8)
+                expected_size = header.height * header.width * header.channels
+                if image.size != expected_size:
+                    print(f"[SingleImageReader] Data size mismatch: expected {expected_size}, got {image.size}")
+                    return None
+                image = image.reshape(header.height, header.width, header.channels)
+
+            images = {'head': image}
+            self.buffer = images
+            self.last_timestamp = header.timestamp
+            return images
+
+        except Exception as e:
+            print(f"[SingleImageReader] Error reading from shared memory: {e}")
+            return None
+
+    def read_image(self) -> Optional[np.ndarray]:
+        images = self.read_images()
+        return images['head'] if images and 'head' in images else None
+
+    def read_encoded_frame(self) -> Optional[bytes]:
+        if self.shm is None:
+            return None
+        try:
+            header = self._read_header()
+            if header is None or header.encoding != 1:
+                return None
+            if header.timestamp <= self.last_timestamp:
+                return None
+            header_size = ctypes.sizeof(SimpleImageHeader)
+            start_offset = header_size
+            end_offset = start_offset + header.data_size
+            payload = bytes(self.shm.buf[start_offset:end_offset])
+            self.last_timestamp = header.timestamp
+            return payload
+        except Exception as e:
+            print(f"[SingleImageReader] Error reading encoded frame: {e}")
+            return None
+
+    def close(self):
+        if self.shm is not None:
+            self.shm.close()
+            print(f"[SingleImageReader] Shared memory closed: {self.shm_name}")
+
+
 class MultiImageReader:
     """A simplified multi-image shared memory reader"""
     

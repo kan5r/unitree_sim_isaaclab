@@ -15,17 +15,19 @@ import queue
 
 # add the project root directory to the path, so that the shared memory tool can be imported
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
-from image_server.shared_memory_utils import MultiImageWriter
+from image_server.shared_memory_utils import MultiImageWriter, SingleImageWriter
 
 if TYPE_CHECKING:
     from isaaclab.envs import ManagerBasedRLEnv
 
 # create the global multi-image shared memory writer
-multi_image_writer = MultiImageWriter()
+# multi_image_writer = MultiImageWriter()
+single_image_writer = SingleImageWriter()
 
 def set_writer_options(enable_jpeg: bool = False, jpeg_quality: int = 85, skip_cvtcolor: bool = False):
     try:
-        multi_image_writer.set_options(enable_jpeg=enable_jpeg, jpeg_quality=jpeg_quality, skip_cvtcolor=skip_cvtcolor)
+        # multi_image_writer.set_options(enable_jpeg=enable_jpeg, jpeg_quality=jpeg_quality, skip_cvtcolor=skip_cvtcolor)
+        single_image_writer.set_options(enable_jpeg=enable_jpeg, jpeg_quality=jpeg_quality, skip_cvtcolor=skip_cvtcolor)
         print(f"[camera_state] writer options: jpeg={enable_jpeg}, quality={jpeg_quality}, skip_cvtcolor={skip_cvtcolor}")
     except Exception as e:
         print(f"[camera_state] failed to set writer options: {e}")
@@ -45,13 +47,15 @@ _async_queue = None
 _async_thread = None
 _async_started = False
 
-def _async_writer_loop(q: "queue.Queue", writer: MultiImageWriter):
+# def _async_writer_loop(q: "queue.Queue", writer: MultiImageWriter):
+def _async_writer_loop(q: "queue.Queue", writer: SingleImageWriter):
     while True:
         try:
             item = q.get()
             if item is None:
                 break
-            writer.write_images(item)
+            # writer.write_images(item)
+            writer.write_image(item['head'])
         except Exception as e:
             print(f"[camera_state] Async writer error: {e}")
 
@@ -59,7 +63,8 @@ def _ensure_async_started():
     global _async_started, _async_queue, _async_thread
     if not _async_started:
         _async_queue = queue.Queue(maxsize=1)
-        _async_thread = threading.Thread(target=_async_writer_loop, args=(_async_queue, multi_image_writer), daemon=True)
+        # _async_thread = threading.Thread(target=_async_writer_loop, args=(_async_queue, multi_image_writer), daemon=True)
+        _async_thread = threading.Thread(target=_async_writer_loop, args=(_async_queue, single_image_writer), daemon=True)
         _async_thread.start()
         _async_started = True
 

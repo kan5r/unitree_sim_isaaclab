@@ -40,14 +40,14 @@ class ObjectTableSceneCfg(TableRedBlockSceneCfg):
     
     # Humanoid robot w/ arms higher
     # 5. humanoid robot configuration 
-    robot: ArticulationCfg = G1RobotPresets.g1_29dof_dex3_base_fix(init_pos=(-4.2, -3.7, 0.76),
+    robot: ArticulationCfg = G1RobotPresets.g1_29dof_dex3_base_fix_no_wrist_camera(init_pos=(-4.2, -3.7, 0.76),
         init_rot=(0.7071, 0, 0, -0.7071))
 
 
     # 6. add camera configuration 
     front_camera = CameraPresets.g1_front_camera()
-    left_wrist_camera = CameraPresets.left_dex3_wrist_camera()
-    right_wrist_camera = CameraPresets.right_dex3_wrist_camera()
+    # left_wrist_camera = CameraPresets.left_dex3_wrist_camera()  # disabled - wrist camera removed
+    # right_wrist_camera = CameraPresets.right_dex3_wrist_camera()  # disabled - wrist camera removed
 
 ##
 # MDP settings
